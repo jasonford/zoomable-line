@@ -9,12 +9,7 @@ const getPlaceValueTicks = (min, max, placeValue) => {
   for (let i=0; i<numVisible; i++) {
     const x = Math.round(Math.ceil(min/placeValue) + i)/(1/placeValue);
     if (x%(10*placeValue) !== 0) {
-      ticks.push({
-        label: '' + x,
-        scale,
-        x,
-        y:0
-      });
+      ticks.push({ label: `${x}`, scale, x, y:0 });
     }
   }
   return ticks;

@@ -1,19 +1,41 @@
 import React from 'react';
 import './App.css';
 
-const getTicks = (min, max) => {
-  const numDivisions = 10;
-  const ticks = [...new Array(numDivisions)].map((_, index) => {
-    return { label: '0.' + index, x: 0.1*index, y: 0 };
-  });
+const getPlaceValueTicks = (min, max, placeValue) => {
+  const numVisible = Math.ceil((max - min) / placeValue)
+  const ticks = [];
+  const scale = Math.min(2, 3 / (max - min) * 10 * placeValue);
+  if (scale < 0.3) return [];
+  for (let i=0; i<numVisible; i++) {
+    const x = Math.round(Math.ceil(min/placeValue) + i)/(1/placeValue);
+    if (x%(10*placeValue) !== 0) {
+      ticks.push({
+        label: '' + x,
+        scale,
+        x,
+        y:0
+      });
+    }
+  }
   return ticks;
 }
 
+const getTicks = (min, max) => {
+  return [
+    { label: '0', x: 0, y: 0, scale: 2 },
+    ...getPlaceValueTicks(min, max, 1),
+    ...getPlaceValueTicks(min, max, 10),
+    ...getPlaceValueTicks(min, max, 100),
+    ...getPlaceValueTicks(min, max, 1000),
+    ...getPlaceValueTicks(min, max, 10000),
+    ...getPlaceValueTicks(min, max, 100000)
+  ];
+}
 
 export default class ZoomableLine extends React.Component {
   state = {
-    min: 0,
-    max: 1,
+    min: 2019 - 10,
+    max: 2019 + 10,
     width: 0,
     height: 0
   }
@@ -35,7 +57,7 @@ export default class ZoomableLine extends React.Component {
     }
     else {
       const direction = Math.sign(event.deltaY);
-      const scale = (direction < 0 ? 0.9 : 1.1);
+      const scale = (direction < 0 ? 1/1.05 : 1.05);
 
       const scaledEventX = this.state.min + (event.clientX / window.innerWidth) * (this.state.max - this.state.min);
       this.setState({
@@ -83,8 +105,6 @@ export default class ZoomableLine extends React.Component {
         ref={this.container}
         style={{width: '100%', height: '100%', overflow: 'hidden', position: 'relative'}}
       >
-        <div>{this.state.min}</div>
-        <div>{this.state.max}</div>
         {
           divisions.map(
             d => {
@@ -99,9 +119,9 @@ export default class ZoomableLine extends React.Component {
                     left: 0,
                     width: 0,
                     height: 0,
-                    transform: `translate(${x}px, ${y}px)`,
+                    transformOrigin: '0% 50%',
+                    transform: `translate(${x}px, ${y}px) scale(${d.scale})`,
                     display: 'flex',
-                    alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >

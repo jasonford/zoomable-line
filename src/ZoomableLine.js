@@ -1,13 +1,21 @@
 import React from 'react';
 import './App.css';
 
+const elementCenter = el => {
+  const bb = el.getBoundingClientRect();
+  return {
+    x: bb.left + bb.width / 2,
+    y: bb.top + bb.height / 2
+  }
+}
+
 const getPlaceValueTicks = (min, max, placeValue) => {
   const numVisible = Math.ceil((max - min) / placeValue)
   const ticks = [];
   const scale = Math.min(2, 3 / (max - min) * 10 * placeValue);
   if (scale < 0.3) return [];
   for (let i=0; i<numVisible; i++) {
-    const x = Math.round(Math.ceil(min/placeValue) + i)/(1/placeValue);
+    const x = Math.round((Math.ceil(min/placeValue) + i)/(1/placeValue));
     if (x%(10*placeValue) !== 0) {
       ticks.push({ label: `${x}`, scale, x, y:0 });
     }
@@ -38,13 +46,12 @@ export default class ZoomableLine extends React.Component {
   constructor() {
     super()
     this.container = React.createRef();
-    document.addEventListener('wheel', this.handleMouseWheel);
     document.addEventListener('mousedown', this.handleMouseDown);
     document.addEventListener('mousemove', this.handleMouseMove);
     document.addEventListener('mouseup', this.handleMouseUp);
   }
 
-  handleMouseWheel = (event) => {
+  handleMouseWheel = (event, altCenter) => {
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
       const direction = Math.sign(event.deltaY);
       const deltaX = direction * window.innerWidth/100;
@@ -53,13 +60,15 @@ export default class ZoomableLine extends React.Component {
     else {
       const direction = Math.sign(event.deltaY);
       const scale = (direction < 0 ? 1/1.05 : 1.05);
+      let x = altCenter ? altCenter.x : event.clientX; 
 
-      const scaledEventX = this.state.min + (event.clientX / window.innerWidth) * (this.state.max - this.state.min);
+      const scaledEventX = this.state.min + (x / window.innerWidth) * (this.state.max - this.state.min);
       this.setState({
         min: this.state.min*scale + (scaledEventX * (1-scale)),
         max: this.state.max*scale + (scaledEventX * (1-scale))
       });
     }
+    event.stopPropagation();
   }
 
   handleMouseDown = (event) => {
@@ -99,6 +108,7 @@ export default class ZoomableLine extends React.Component {
       <div
         ref={this.container}
         style={{width: '100%', height: '100%', overflow: 'hidden', position: 'relative'}}
+        onWheel={ this.handleMouseWheel }
       >
         {
           divisions.map(
@@ -108,6 +118,7 @@ export default class ZoomableLine extends React.Component {
               return (
                 <div
                   key={d.label}
+                  onWheel={ e => this.handleMouseWheel(e, elementCenter(e.target)) }
                   style={{
                     position: 'absolute',
                     top: 0,

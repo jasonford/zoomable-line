@@ -9,15 +9,15 @@ const elementCenter = el => {
   }
 }
 
-const getPlaceValueTicks = (min, max, placeValue) => {
+const getPlaceValueTicks = (min, max, placeValue, label = l => l) => {
   const numVisible = Math.ceil((max - min) / placeValue)
   const ticks = [];
-  const scale = Math.min(2, 3 / (max - min) * 10 * placeValue);
-  if (scale < 0.3) return [];
+  const scale = Math.min(1, 3 / (max - min) * 10 * placeValue);
+  if (scale < 0.2) return [];
   for (let i=0; i<numVisible; i++) {
     const x = Math.round((Math.ceil(min/placeValue) + i)/(1/placeValue));
     if (x%(10*placeValue) !== 0) {
-      ticks.push({ label: `${x}`, scale, x, y:0 });
+      ticks.push({ label: `${label(x)}`, scale, x, y:0 });
     }
   }
   return ticks;
@@ -25,7 +25,8 @@ const getPlaceValueTicks = (min, max, placeValue) => {
 
 const getTicks = (min, max) => {
   return [
-    { label: '0', x: 0, y: 0, scale: 2 },
+    { label: '0', x: 0, y: 0, scale: 1 },
+    ...getPlaceValueTicks(min, max, 1/12, x => 'month'),
     ...getPlaceValueTicks(min, max, 1),
     ...getPlaceValueTicks(min, max, 10),
     ...getPlaceValueTicks(min, max, 100),
@@ -121,6 +122,7 @@ export default class ZoomableLine extends React.Component {
                   onWheel={ e => this.handleMouseWheel(e, elementCenter(e.target)) }
                   style={{
                     position: 'absolute',
+                    fontSize: 24,
                     top: 0,
                     left: 0,
                     width: 0,

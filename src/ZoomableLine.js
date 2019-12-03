@@ -14,23 +14,23 @@ const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ")
 const getPlaceValueTicks = (min, max, wholeUnit, fractionalUnit = 1, label = l => l) => {
   const numVisible = Math.ceil((max - min) / wholeUnit * fractionalUnit);
   const ticks = [];
-  const scale = Math.min(1, 20/(max - min) * wholeUnit / fractionalUnit);
+  const scale = Math.min(1, 10/(max - min) * (wholeUnit / fractionalUnit));
   if (scale < 0.2) return [];
-  for (let i=0; i<numVisible; i++) {
-    const x = (Math.ceil(min/(wholeUnit/fractionalUnit)) + i) * wholeUnit / fractionalUnit;
+  for (let i=-1; i<numVisible; i++) {
+    const start = (Math.ceil(min/(wholeUnit/fractionalUnit)) + i) * wholeUnit / fractionalUnit;
     ticks.push({
-      label: label(x),
+      label: label(start),
       scale,
-      nextX: (Math.ceil(min/(wholeUnit/fractionalUnit)) + i+1) * wholeUnit / fractionalUnit,
-      x,
-      y:0
+      start,
+      labelPosition: 'start',
+      end: (Math.ceil(min/(wholeUnit/fractionalUnit)) + i+1) * wholeUnit / fractionalUnit
     });
   }
   return ticks;
 }
 
 const getTicks = (min, max) => {
-  const takenTickXValues = {}
+  const takenTickLabels = {}
   const yearLabels = year => {
     let yearString = Math.abs(year);
     if (year % 100000000 === 0 && Math.abs(year) >= 1000000000) {
@@ -44,15 +44,57 @@ const getTicks = (min, max) => {
     }
     return <pre>{yearString} {year < 0 && 'bc'}</pre>;
   }
-  const days = [];
-  const hours = [];
-  const minutes = [];
-  const seconds = [];
-  const milliseconds = [];
-  const microseconds = [];
-  const nanoseconds = [];
+  const monthTicks = getPlaceValueTicks(min, max, 1, 12, x => {
+    if (x < 0) x = x%1+1
+    return <pre>{MONTHS[Math.round(x%1*12)]}</pre>
+  }).map( monthTick => {
+    monthTick.labelPosition = 'center';
+    return monthTick;
+  })
+  const dayTicks = [];
+  monthTicks.forEach( monthTick => {
+    const daysInMonth = 30;
+    const daySpan = (monthTick.end - monthTick.start)/daysInMonth
+    const scale = Math.min(1, (monthTick.end - monthTick.start) / (max - min))
+    if (scale < 0.2) return;
+    for (let i=0; i<daysInMonth; i++) {
+      dayTicks.push({
+        start: monthTick.start + daySpan*i,
+        end: monthTick.start + daySpan*(i+1),
+        scale,
+        label: <pre>{i+1}</pre>
+      })
+    }
+  })
+
+  const hourTicks = [];
+
+  const hourString = hour => {
+    if (hour === 0) return '12am';
+    if (hour === 12) return '12pm';
+    return hour < 12 ? hour + 'am' : (hour - 12) + 'pm'
+  }
+
+  dayTicks.forEach( dayTick => {
+    const hoursInDay = 24;
+    const hourSpan = (dayTick.end - dayTick.start)/hoursInDay
+    const scale = Math.min(1, (dayTick.end - dayTick.start) / (max - min))
+    if (scale < 0.2) return;
+    for (let i=0; i<hoursInDay; i++) {
+      const start = dayTick.start + hourSpan*i;
+      const end = start + hourSpan;
+      if (start < max && end > min) {
+        hourTicks.push({
+          start,
+          end,
+          scale,
+          label: <pre>{hourString(i)}</pre>
+        })
+      }
+    }
+  })
   return [
-    { label: <pre>0</pre>, x: 0, y: 0, scale: 1, nextX: 1 },
+    { label: <pre>0</pre>, start: 0, end: 0, y: 0, scale: 1 },
     ...getPlaceValueTicks(min, max, 100000000000, 1, yearLabels),
     ...getPlaceValueTicks(min, max, 10000000000, 1, yearLabels),
     ...getPlaceValueTicks(min, max, 1000000000, 1, yearLabels),
@@ -65,21 +107,10 @@ const getTicks = (min, max) => {
     ...getPlaceValueTicks(min, max, 100, 1, yearLabels),
     ...getPlaceValueTicks(min, max, 10, 1, yearLabels),
     ...getPlaceValueTicks(min, max, 1, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 1, 12, x => {
-      if (x < 0) x = x%1+1
-      return <pre>{MONTHS[Math.round(x%1*12)]}</pre>
-    })
-  ].map(
-    tick => {
-      if (takenTickXValues[tick.x]) {
-        return false;
-      }
-      else {
-        takenTickXValues[tick.x] = true;
-        return tick
-      }
-    }
-  ).filter( tick => tick );
+    ...monthTicks,
+    ...dayTicks,
+    ...hourTicks
+  ];
 }
 
 export default class ZoomableLine extends React.Component {
@@ -160,17 +191,13 @@ export default class ZoomableLine extends React.Component {
         {
           divisions.map(
             d => {
-              const x = (d.x - this.state.min) / (this.state.max - this.state.min) * this.state.width;
+              const x = (d.start - this.state.min) / (this.state.max - this.state.min) * this.state.width;
               const y = this.state.height / 2;
-              const deltaToNextX = Math.abs(d.nextX - d.x);
-              const clickMin = d.x - deltaToNextX/3;
-              const clickMax = d.nextX + deltaToNextX/3;
 
               return (
                 <div
-                  key={d.x}
+                  key={d.start + '-' + d.end}
                   onWheel={ e => this.handleMouseWheel(e, elementCenter(e.target)) }
-                  onClick={ e => this.setState({min: clickMin, max: clickMax})}
                   style={{
                     opacity: d.scale,
                     position: 'absolute',

@@ -9,48 +9,64 @@ const elementCenter = el => {
   }
 }
 
-const MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ")
+const MONTHS = "January Febuary March April May June July August September October November December".split(" ")
 
-const getPlaceValueTicks = (min, max, wholeUnit, fractionalUnit = 1, label = l => l) => {
-  const numVisible = Math.ceil((max - min) / wholeUnit * fractionalUnit);
+const yearLabel = year => {
+  let yearString = Math.abs(year);
+  if (year % 100000000 === 0 && Math.abs(year) >= 1000000000) {
+    yearString = Math.abs(year) / 1000000000 + 'B';
+  }
+  else if (year % 100000 === 0 && Math.abs(year) >= 1000000) {
+    yearString = Math.abs(year) / 1000000 + 'M';
+  }
+  else if (year % 100 === 0 && Math.abs(year) >= 10000) {
+    yearString = Math.abs(year) / 1000 + 'K';
+  }
+  return <pre>{yearString}{year < 0 && ' bc'}</pre>;
+}
+
+const getYearTicks = (min, max, wholeUnit = 1) => {
+  const numVisible = Math.ceil((max - min) / wholeUnit);
   const ticks = [];
-  const scale = Math.min(1, 10/(max - min) * (wholeUnit / fractionalUnit));
-  if (scale < 0.2) return [];
+  const scale = Math.min(1, 10/(max - min) * (wholeUnit));
+  if (scale < 0.2) {
+    return getYearTicks(min, max, wholeUnit * 10)
+  }
   for (let i=-1; i<numVisible; i++) {
-    const start = (Math.ceil(min/(wholeUnit/fractionalUnit)) + i) * wholeUnit / fractionalUnit;
+    const start = (Math.ceil(min/(wholeUnit)) + i) * wholeUnit;
     ticks.push({
-      label: label(start),
-      scale,
+      label: yearLabel(start),
+      scale: start % (wholeUnit*10) === 0 ? 1 : scale,
       start,
-      labelPosition: 'start',
-      end: (Math.ceil(min/(wholeUnit/fractionalUnit)) + i+1) * wholeUnit / fractionalUnit
+      end: (Math.ceil(min/wholeUnit) + i+1) * wholeUnit
     });
   }
   return ticks;
 }
 
 const getTicks = (min, max) => {
-  const takenTickLabels = {}
-  const yearLabels = year => {
-    let yearString = Math.abs(year);
-    if (year % 100000000 === 0 && Math.abs(year) >= 1000000000) {
-      yearString = Math.abs(year) / 1000000000 + 'B';
+  const yearTicks = getYearTicks(min, max);
+
+  const monthTicks = []
+  yearTicks.forEach( yearTick => {
+    const monthsInYear = 12
+    const monthSpan = (yearTick.end - yearTick.start)/monthsInYear
+    const scale = Math.min(1, (yearTick.end - yearTick.start) / (max - min))
+    if (scale < 0.2) return;
+    for (let i=0; i<monthsInYear; i++) {
+      const start = yearTick.start + monthSpan*i;
+      const end = start + monthSpan;
+      if (start < max && end > min) {
+        monthTicks.push({
+          start,
+          end,
+          scale,
+          label: <pre>{MONTHS[i]}</pre>
+        })
+      }
     }
-    else if (year % 100000 === 0 && Math.abs(year) >= 1000000) {
-      yearString = Math.abs(year) / 1000000 + 'M';
-    }
-    else if (year % 100 === 0 && Math.abs(year) >= 10000) {
-      yearString = Math.abs(year) / 1000 + 'K';
-    }
-    return <pre>{yearString} {year < 0 && 'bc'}</pre>;
-  }
-  const monthTicks = getPlaceValueTicks(min, max, 1, 12, x => {
-    if (x < 0) x = x%1+1
-    return <pre>{MONTHS[Math.round(x%1*12)]}</pre>
-  }).map( monthTick => {
-    monthTick.labelPosition = 'center';
-    return monthTick;
   })
+
   const dayTicks = [];
   monthTicks.forEach( monthTick => {
     const daysInMonth = 30;
@@ -58,12 +74,16 @@ const getTicks = (min, max) => {
     const scale = Math.min(1, (monthTick.end - monthTick.start) / (max - min))
     if (scale < 0.2) return;
     for (let i=0; i<daysInMonth; i++) {
-      dayTicks.push({
-        start: monthTick.start + daySpan*i,
-        end: monthTick.start + daySpan*(i+1),
-        scale,
-        label: <pre>{i+1}</pre>
-      })
+      const start = monthTick.start + daySpan*i;
+      const end = start + daySpan;
+      if (start < max && end > min) {
+        dayTicks.push({
+          start,
+          end,
+          scale,
+          label: <pre>{i+1}</pre>
+        })
+      }
     }
   })
 
@@ -94,19 +114,7 @@ const getTicks = (min, max) => {
     }
   })
   return [
-    { label: <pre>0</pre>, start: 0, end: 0, y: 0, scale: 1 },
-    ...getPlaceValueTicks(min, max, 100000000000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 10000000000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 1000000000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 100000000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 10000000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 1000000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 100000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 10000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 1000, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 100, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 10, 1, yearLabels),
-    ...getPlaceValueTicks(min, max, 1, 1, yearLabels),
+    ...yearTicks,
     ...monthTicks,
     ...dayTicks,
     ...hourTicks
@@ -206,7 +214,7 @@ export default class ZoomableLine extends React.Component {
                     left: 0,
                     width: 0,
                     height: 0,
-                    transformOrigin: '0% 50%',
+                    transformOrigin: '0% 0%',
                     transform: `translate(${x}px, ${y}px) scale(${d.scale})`,
                     display: 'flex',
                     justifyContent: 'center'

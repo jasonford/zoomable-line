@@ -114,10 +114,10 @@ const getTicks = (min, max) => {
     }
   })
   return [
-    ...yearTicks,
-    ...monthTicks,
-    ...dayTicks,
-    ...hourTicks
+    yearTicks,
+    monthTicks,
+    dayTicks,
+    hourTicks,
   ];
 }
 
@@ -187,8 +187,8 @@ export default class ZoomableLine extends React.Component {
 
   render = () => {
     let { center, zoomScale, width, height } = this.state;
-    let divisions = [];
-    if (width > 0) divisions = getTicks(this.state.min, this.state.max);
+    let divisionGroups = [];
+    if (width > 0) divisionGroups = getTicks(this.state.min, this.state.max);
 
     return (
       <div
@@ -197,30 +197,37 @@ export default class ZoomableLine extends React.Component {
         onWheel={ this.handleMouseWheel }
       >
         {
-          divisions.map(
-            d => {
-              const x = (d.start - this.state.min) / (this.state.max - this.state.min) * this.state.width;
-              const y = this.state.height / 2;
-
+          divisionGroups.map(
+            divisionGroup => {
               return (
-                <div
-                  key={d.start + '-' + d.end}
-                  onWheel={ e => this.handleMouseWheel(e, elementCenter(e.target)) }
-                  style={{
-                    opacity: d.scale,
-                    position: 'absolute',
-                    fontSize: 24,
-                    top: 0,
-                    left: 0,
-                    width: 0,
-                    height: 0,
-                    transformOrigin: '0% 0%',
-                    transform: `translate(${x}px, ${y}px) scale(${d.scale})`,
-                    display: 'flex',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <div>{d.label}</div>
+                <div style={{position: 'relative', height: 48}}>
+                  {
+                    divisionGroup.map( d => {
+                      let x = (d.start - this.state.min) / (this.state.max - this.state.min) * this.state.width;
+                      if (x < 0) {
+                        x = 0; //  TODO: interpolate this number so it smoothly disappears as new values slide in
+                      }
+                      return (
+                        <div
+                          key={d.start + '-' + d.end}
+                          onWheel={ e => this.handleMouseWheel(e, elementCenter(e.target)) }
+                          style={{
+                            opacity: d.scale,
+                            position: 'absolute',
+                            fontSize: 24,
+                            top: 0,
+                            left: 0,
+                            transformOrigin: '0% 0%',
+                            transform: `translate(${x}px, 0px) scale(${d.scale})`,
+                            display: 'flex',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          <div>{d.label}</div>
+                        </div>
+                      )
+                    })
+                  }
                 </div>
               );
             }
